@@ -1,5 +1,11 @@
 from qdrant_client import QdrantClient
 from typing import List
+from dotenv import load_dotenv
+import openai
+
+# Load environment variables from .env file
+load_dotenv()
+
 
 def retrieve_data_from_qdrant(vector: List[float], top_k: int = 5) -> None:
     """
@@ -35,3 +41,4 @@ if __name__ == "__main__":
     text_to_search = "modulai"
     vector = get_embedding(text_to_search)
     retrieve_data_from_qdrant(vector=vector, top_k=3)
+    print(vector)
