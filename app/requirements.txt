@@ -3,4 +3,8 @@ pandas
 numpy
 openai
 pinecone-client  # Or other vector database client library
+requests
+beautifulsoup4
+qdrant-client
+python-dotenv
 
