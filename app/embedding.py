@@ -20,44 +20,91 @@ def get_embedding(text: str) -> List[float]:
     )
     return response.data[0].embedding
 
-
-
-def store_data_in_qdrant(data: List[Dict[str, str]]) -> None:
+def store_data_in_qdrant(data: List[Dict[str, str]], similarity_threshold: float = 0.9) -> None:
     """
-    Stores the given data in Qdrant as vectors.
+    Stores the given data in Qdrant while avoiding duplicates.
 
     Args:
-        data (List[Dict[str, str]]): A list of dictionaries containing company data.
+        data (List[Dict[str, str]]): A list of dictionaries containing page data.
+        similarity_threshold (float): Threshold above which a vector is considered a duplicate.
     """
     client = QdrantClient(host="localhost", port=6333)
-    collection_name: str = "company_data"
+    collection_name = "company_data_v2"
 
-    # Check if the collection exists, and create it if it doesn't
     if not client.collection_exists(collection_name=collection_name):
         client.create_collection(
             collection_name=collection_name,
             vectors_config={
-                "size": len(get_embedding("test")),  # assuming the length of embedding from OpenAI model
-                "distance": "Cosine"  # or "Euclidean" depending on your use case
+                "size": len(get_embedding("test")),
+                "distance": "Cosine"
             }
         )
 
-    # Prepare points to upsert
-    points: List[Dict] = []
     for item in data:
-        vector = get_embedding(item['title'])
-        point_id: str = str(uuid.uuid4())  # Generate a new UUID for the point ID
-        points.append({
-            "id": point_id,
-            "vector": vector,
-            "payload": item
-        })
+        # Generate embedding for the full page content
+        vector = get_embedding(item['content'])
 
-    # Upsert the points in Qdrant
-    client.upsert(
-        collection_name=collection_name,
-        points=points
-    )
+        # Search for similar vectors in the database
+        response = client.search(
+            collection_name=collection_name,
+            query_vector=vector,
+            limit=1,
+            with_payload=False,
+            with_vectors=False
+        )
+
+        # Check if any existing vector is similar above the given threshold
+        if response and response[0].score >= similarity_threshold:
+            print(f"Duplicate content detected, skipping storage: {item['url']}")
+            continue
+
+        # Store the vector if it's not a duplicate
+        point_id = str(uuid.uuid4())
+        client.upsert(
+            collection_name=collection_name,
+            points=[{
+                "id": point_id,
+                "vector": vector,
+                "payload": item
+            }]
+        )
+
+# def store_data_in_qdrant(data: List[Dict[str, str]]) -> None:
+#     """
+#     Stores the given data in Qdrant as vectors.
+#
+#     Args:
+#         data (List[Dict[str, str]]): A list of dictionaries containing company data.
+#     """
+#     client = QdrantClient(host="localhost", port=6333)
+#     collection_name: str = "company_data"
+#
+#     # Check if the collection exists, and create it if it doesn't
+#     if not client.collection_exists(collection_name=collection_name):
+#         client.create_collection(
+#             collection_name=collection_name,
+#             vectors_config={
+#                 "size": len(get_embedding("test")),  # assuming the length of embedding from OpenAI model
+#                 "distance": "Cosine"  # or "Euclidean" depending on your use case
+#             }
+#         )
+#
+#     # Prepare points to upsert
+#     points: List[Dict] = []
+#     for item in data:
+#         vector = get_embedding(item['title'])
+#         point_id: str = str(uuid.uuid4())  # Generate a new UUID for the point ID
+#         points.append({
+#             "id": point_id,
+#             "vector": vector,
+#             "payload": item
+#         })
+#
+#     # Upsert the points in Qdrant
+#     client.upsert(
+#         collection_name=collection_name,
+#         points=points
+#     )
 
 
 # # Example usage

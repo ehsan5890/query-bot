@@ -1,30 +1,42 @@
 from qdrant_client import QdrantClient
 from typing import List, Dict
+from app.embedding import get_embedding
+
+
+from qdrant_client import QdrantClient
 from embedding import get_embedding
+from typing import List, Dict
 
-
-def retrieve_data_from_qdrant(query: str, top_k: int = 5) -> List[Dict]:
+def retrieve_data_from_qdrant(query: str, top_k: int = 5, min_score: float = 0.5) -> List[Dict]:
     """
-    Retrieves data from Qdrant based on a query vector.
+    Retrieves data from Qdrant using a similarity search and filters based on score.
 
     Args:
         query (str): The query text to find related data.
         top_k (int): The number of most similar results to retrieve.
+        min_score (float): The minimum score to filter out irrelevant results.
 
     Returns:
         List[Dict]: A list of data points retrieved from Qdrant.
     """
     client = QdrantClient(host="localhost", port=6333)
-    collection_name = "company_data"
+    collection_name = "company_data_v2"
     vector = get_embedding(query)
 
+    # Retrieve top_k results from Qdrant
     response = client.search(
         collection_name=collection_name,
         query_vector=vector,
-        limit=top_k
+        limit=top_k,
+        with_payload=True,
+        with_vectors=False
     )
 
-    return [point.payload for point in response]
+    # Filter results based on a score threshold (assuming similarity scores are provided)
+    filtered_results = [point.payload for point in response if point.score >= min_score]
+
+    return filtered_results
+
 
 # Example usage for RAG
 # query = "machine learning services"
@@ -70,7 +82,7 @@ def retrieve_all_data_from_qdrant(collection_name: str, batch_size: int = 100) -
 
 # Example usage
 if __name__ == "__main__":
-    all_data = retrieve_all_data_from_qdrant("company_data")
+    all_data = retrieve_all_data_from_qdrant("company_data_v2")
     for data in all_data:
         print(data)
 

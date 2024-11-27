@@ -6,6 +6,9 @@ from typing import List, Dict, Optional
 from qdrant_client import QdrantClient
 from urllib.parse import urljoin
 import openai
+from bs4 import BeautifulSoup
+import requests
+from typing import Optional, Dict
 
 
 def get_all_links(base_url: str) -> List[str]:
@@ -45,24 +48,50 @@ def get_all_links(base_url: str) -> List[str]:
     return all_links
 
 
+
+
+
 def fetch_company_data(url: str) -> Optional[Dict[str, str]]:
     """
-    Fetches company data from a given URL.
+    Fetches all relevant data from a given URL.
 
     Args:
-        url (str): The URL of the company's webpage.
+        url (str): The URL of the webpage.
 
     Returns:
-        Optional[Dict[str, str]]: A dictionary containing the title, main heading, and URL, or None if the request fails.
+        Optional[Dict[str, str]]: A dictionary containing the page content, title, and URL, or None if the request fails.
     """
-    response = requests.get(url)
-    if response.status_code == 200:
-        soup = BeautifulSoup(response.content, 'html.parser')
-        title = soup.find('title').get_text() if soup.find('title') else "No title found"
-        main_heading = soup.find('h1').get_text() if soup.find('h1') else "No main heading found"
-        return {"title": title, "main_heading": main_heading, "url": url}
-    else:
-        print(f"Failed to retrieve data from {url}")
+    try:
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"
+        }
+        response = requests.get(url, headers=headers)
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.content, 'html.parser')
+
+            # Extract title
+            title = soup.find('title').get_text() if soup.find('title') else "No title found"
+
+            # Extract all headings (h1, h2, h3, etc.)
+            headings = [heading.get_text(strip=True) for heading in soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6'])]
+
+            # Extract all paragraphs
+            paragraphs = [p.get_text(strip=True) for p in soup.find_all('p')]
+
+            # Combine all content into a single text block
+            all_content = "\n".join(headings + paragraphs)
+
+            # Return data as a dictionary
+            return {
+                "title": title,
+                "content": all_content,
+                "url": url
+            }
+        else:
+            print(f"Failed to retrieve data from {url} with status code {response.status_code}")
+            return None
+    except requests.exceptions.RequestException as e:
+        print(f"Exception occurred while fetching data from {url}: {e}")
         return None
 
 
