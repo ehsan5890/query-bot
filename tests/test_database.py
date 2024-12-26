@@ -1,23 +1,7 @@
-from app.data_extraction import fetch_company_data, clean_data, get_all_links
-data_list = []
-url = "https://modulai.io/"
-links = get_all_links(url)
-for link in links:
-    data = fetch_company_data(link)
-    data_list.append(data)
-if data_list:
-    print(data_list)
-    processed_data = clean_data(data_list[0])
-    print("Extracted Data:")
-    print(processed_data)
-else:
-    print("Data extraction failed.")
-
-
 from qdrant_client import QdrantClient
 from typing import List
 
-def search_keyword_in_qdrant(keyword: str, collection_name: str = "company_data_v3", top_k: int = 10) -> List[dict]:
+def search_keyword_in_qdrant(keyword: str, collection_name: str = "company_data", top_k: int = 10) -> List[dict]:
     """
     Searches the Qdrant collection for records that contain the specified keyword in their payload.
 
@@ -54,6 +38,6 @@ def search_keyword_in_qdrant(keyword: str, collection_name: str = "company_data_
 # Example usage
 if __name__ == "__main__":
 
-    results = search_keyword_in_qdrant("Peter Grimvall")
+    results = search_keyword_in_qdrant("machine learning")
     for result in results:
         print(result)

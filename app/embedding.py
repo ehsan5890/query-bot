@@ -1,7 +1,10 @@
 import uuid
+from lib2to3.pgen2.tokenize import tokenize
 from typing import List, Dict
 from qdrant_client import QdrantClient
 import openai
+
+from app.preprocessing import process_large_text
 
 
 def get_embedding(text: str) -> List[float]:
@@ -14,13 +17,16 @@ def get_embedding(text: str) -> List[float]:
     Returns:
         List[float]: A list representing the embedding vector.
     """
-    response = openai.embeddings.create(
-        model="text-embedding-ada-002",
-        input=text
-    )
+    try:
+        response = openai.embeddings.create(
+            model="text-embedding-ada-002",
+            input=text
+        )
+    except Exception as e:
+        a = 1
     return response.data[0].embedding
 
-def store_data_in_qdrant(data: List[Dict[str, str]], similarity_threshold: float = 0.9) -> None:
+def store_data_in_qdrant(data: List[Dict[str, str]], similarity_threshold: float = 0.99) -> None:
     """
     Stores the given data in Qdrant while avoiding duplicates.
 
@@ -29,7 +35,7 @@ def store_data_in_qdrant(data: List[Dict[str, str]], similarity_threshold: float
         similarity_threshold (float): Threshold above which a vector is considered a duplicate.
     """
     client = QdrantClient(host="localhost", port=6333)
-    collection_name = "company_data_v2"
+    collection_name = "company_data_v4"
 
     if not client.collection_exists(collection_name=collection_name):
         client.create_collection(
@@ -42,32 +48,36 @@ def store_data_in_qdrant(data: List[Dict[str, str]], similarity_threshold: float
 
     for item in data:
         # Generate embedding for the full page content
-        vector = get_embedding(item['content'])
+        text, token_count = process_large_text(item['content'])
+        if token_count > 8192:
+            print("Text is too long. Consider summarizing or splitting it.")
+        else:
+            vector = get_embedding(item['content'])
 
-        # Search for similar vectors in the database
-        response = client.search(
-            collection_name=collection_name,
-            query_vector=vector,
-            limit=1,
-            with_payload=False,
-            with_vectors=False
-        )
+            # Search for similar vectors in the database
+            response = client.search(
+                collection_name=collection_name,
+                query_vector=vector,
+                limit=1,
+                with_payload=True,
+                with_vectors=True
+            )
 
-        # Check if any existing vector is similar above the given threshold
-        if response and response[0].score >= similarity_threshold:
-            print(f"Duplicate content detected, skipping storage: {item['url']}")
-            continue
+            # Check if any existing vector is similar above the given threshold
+            if response and response[0].score >= similarity_threshold:
+                print(f"Duplicate content detected, skipping storage: {item['url']}")
+                continue
 
-        # Store the vector if it's not a duplicate
-        point_id = str(uuid.uuid4())
-        client.upsert(
-            collection_name=collection_name,
-            points=[{
-                "id": point_id,
-                "vector": vector,
-                "payload": item
-            }]
-        )
+            # Store the vector if it's not a duplicate
+            point_id = str(uuid.uuid4())
+            client.upsert(
+                collection_name=collection_name,
+                points=[{
+                    "id": point_id,
+                    "vector": vector,
+                    "payload": item
+                }]
+            )
 
 # def store_data_in_qdrant(data: List[Dict[str, str]]) -> None:
 #     """

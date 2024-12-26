@@ -1,8 +1,8 @@
 
-from flask import Flask, request, jsonify
+from flask import Flask, render_template, request, jsonify
 # from app import app  # Import the app instance from __init__.py
 from app.data_extraction import get_all_links, fetch_company_data, clean_data
-from app.data_retrieval import  retrieve_data_from_qdrant
+from app.data_retrieval import  retrieve_data_from_qdrant, filter_similar_content, summarize_content, remove_internal_duplicates
 from app.embedding import store_data_in_qdrant
 from dotenv import load_dotenv
 import openai
@@ -15,8 +15,8 @@ client = openai.OpenAI(
     api_key=os.environ.get("OPENAI_API_KEY")  # Ensure the API key is set in the environment variables
 )
 @app.route('/')
-def home():
-    return jsonify({"message": "Welcome to QueryBot!"})
+def index():
+    return render_template('bot_interface.html')
 
 
 @app.route('/extract', methods=['POST'])
@@ -53,25 +53,24 @@ def query_data():
 
     # Retrieve relevant content from Qdrant
     retrieved_data = retrieve_data_from_qdrant(query)
-
+    content_list = [item.get('content', '') for item in retrieved_data]
+    unique_content = filter_similar_content(content_list)
     # Extract content safely
-    context = " ".join([item.get('content', '') for item in retrieved_data if 'content' in item])
+    # context = " ".join([item.get('content', '') for item in retrieved_data if 'content' in item])
+
+    context = summarize_content(unique_content)
     print(context)
-    print('232323\n')
-    print(retrieved_data)
-    print('232323\n')
-    print(query)
     print('232323\n')
     # Generate response using LLM
     try:
         chat_completion = client.chat.completions.create(
-            model="gpt-4",  # Replace with "gpt-4" or the desired model
+            model="gpt-3.5-turbo",  # Replace with "gpt-4" or the desired model
             messages=[
                 {"role": "system",
                  "content": "You are a helpful assistant that provides information based on given context."},
                 {"role": "user", "content": f"Context: {context}\n\nQuestion: {query}"}
             ],
-            max_tokens=150,
+            max_tokens=1500,
             temperature=0.7  # Adjust temperature for more or less creative responses
         )
         # print(chat_completion)

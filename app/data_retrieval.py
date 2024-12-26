@@ -1,13 +1,14 @@
 from qdrant_client import QdrantClient
 from typing import List, Dict
 from app.embedding import get_embedding
-
-
+from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.feature_extraction.text import TfidfVectorizer
+from typing import List
 from qdrant_client import QdrantClient
-from embedding import get_embedding
+from app.embedding import get_embedding
 from typing import List, Dict
 
-def retrieve_data_from_qdrant(query: str, top_k: int = 5, min_score: float = 0.5) -> List[Dict]:
+def retrieve_data_from_qdrant(query: str, top_k: int = 25, min_score: float = 0.5) -> List[Dict]:
     """
     Retrieves data from Qdrant using a similarity search and filters based on score.
 
@@ -20,7 +21,7 @@ def retrieve_data_from_qdrant(query: str, top_k: int = 5, min_score: float = 0.5
         List[Dict]: A list of data points retrieved from Qdrant.
     """
     client = QdrantClient(host="localhost", port=6333)
-    collection_name = "company_data_v2"
+    collection_name = "company_data_v3"
     vector = get_embedding(query)
 
     # Retrieve top_k results from Qdrant
@@ -80,43 +81,72 @@ def retrieve_all_data_from_qdrant(collection_name: str, batch_size: int = 100) -
     return [point.payload for point in all_points]
 
 
+
+
+
+def remove_internal_duplicates(content_list: List[str]) -> List[str]:
+    """
+    Removes duplicate sentences within each string in a list.
+
+    Args:
+        content_list (List[str]): List of content strings with possible duplicates.
+
+    Returns:
+        List[str]: List of cleaned content strings with duplicates removed.
+    """
+    cleaned_list = []
+
+    for content in content_list:
+        # Split the content into sentences using newline and period delimiters
+        sentences = content.split(".")  # Adjust if you have other delimiters like "\n"
+        unique_sentences = list(dict.fromkeys(sentence.strip() for sentence in sentences if sentence.strip()))
+        # Rejoin unique sentences into a single cleaned string
+        cleaned_content = ". ".join(unique_sentences).strip()
+        cleaned_list.append(cleaned_content)
+
+    return cleaned_list
+
+
+def filter_similar_content(data: List[str], threshold: float = 0.8) -> List[str]:
+    """
+    Filters similar content based on cosine similarity of text.
+
+    Args:
+        data (List[str]): List of content strings.
+        threshold (float): Similarity threshold for deduplication.
+
+    Returns:
+        List[str]: Filtered content list.
+    """
+    vectorizer = TfidfVectorizer().fit_transform(data)
+    vectors = vectorizer.toarray()
+    similarity_matrix = cosine_similarity(vectors)
+
+    filtered = []
+    for i, content in enumerate(data):
+        if all(similarity_matrix[i][j] < threshold for j in range(i)):
+            filtered.append(content)
+
+    return remove_internal_duplicates(filtered)
+
+
+def summarize_content(content_list: List[str], max_length: int = 50000) -> str:
+    """
+    Summarizes content to fit within a specified length.
+
+    Args:
+        content_list (List[str]): List of content strings.
+        max_length (int): Maximum character length of the summary.
+
+    Returns:
+        str: Summarized content.
+    """
+    combined = " ".join(content_list)
+    return combined[:max_length] + "..." if len(combined) > max_length else combined
+
 # Example usage
 if __name__ == "__main__":
-    all_data = retrieve_all_data_from_qdrant("company_data_v2")
+    all_data = retrieve_all_data_from_qdrant("company_data_v3")
     for data in all_data:
         print(data)
 
-# def retrieve_data_from_qdrant(vector: List[float], top_k: int = 5) -> None:
-#     """
-#     Retrieves data from Qdrant using a similarity search based on a given vector.
-#
-#     Args:
-#         vector (List[float]): The vector to use for similarity search.
-#         top_k (int): The number of most similar results to retrieve.
-#
-#     Returns:
-#         None
-#     """
-#     # Initialize Qdrant client
-#     client = QdrantClient(host="localhost", port=6333)
-#     collection_name = "company_data"
-#
-#     # Perform similarity search
-#     response = client.search(
-#         collection_name=collection_name,
-#         query_vector=vector,
-#         limit=top_k  # Retrieve top_k similar items
-#     )
-#
-#     # Process and print the retrieved points
-#     if response:
-#         for point in response:
-#             print(f"ID: {point.id}, Payload: {point.payload}, Score: {point.score}")
-
-# Example usage
-# if __name__ == "__main__":
-#     from data_extraction import get_embedding
-#
-#     text_to_search = "modulai"
-#     vector = get_embedding(text_to_search)
-#     retrieve_data_from_qdrant(vector=vector, top_k=3)

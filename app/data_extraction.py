@@ -39,17 +39,13 @@ def get_all_links(base_url: str) -> List[str]:
 
                 # Filtering out unwanted links
                 if (base_url in full_url and
-                        full_url not in visited and
+                        full_url not in all_links and
                         not any(keyword in full_url for keyword in
                                 ['login', 'user-agreement', 'cookie-policy', 'help', 'legal'])):
                     to_visit.append(full_url)
                     all_links.append(full_url)
 
     return all_links
-
-
-
-
 
 def fetch_company_data(url: str) -> Optional[Dict[str, str]]:
     """
