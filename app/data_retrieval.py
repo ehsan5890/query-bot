@@ -5,10 +5,10 @@ from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.feature_extraction.text import TfidfVectorizer
 from typing import List
 from qdrant_client import QdrantClient
-from app.embedding import get_embedding
+from app.data_extraction import get_collection_name
 from typing import List, Dict
 
-def retrieve_data_from_qdrant(query: str, top_k: int = 25, min_score: float = 0.5) -> List[Dict]:
+def retrieve_data_from_qdrant(query: str, collection_name: str = 'company_data', top_k: int = 25, min_score: float = 0.5) -> List[Dict]:
     """
     Retrieves data from Qdrant using a similarity search and filters based on score.
 
@@ -21,7 +21,7 @@ def retrieve_data_from_qdrant(query: str, top_k: int = 25, min_score: float = 0.
         List[Dict]: A list of data points retrieved from Qdrant.
     """
     client = QdrantClient(host="localhost", port=6333)
-    collection_name = "company_data_v3"
+    # collection_name = "company_data_v3"
     vector = get_embedding(query)
 
     # Retrieve top_k results from Qdrant
@@ -44,7 +44,7 @@ def retrieve_data_from_qdrant(query: str, top_k: int = 25, min_score: float = 0.
 # retrieved_data = retrieve_data_from_qdrant(query)
 # print(retrieved_data)
 
-def retrieve_all_data_from_qdrant(collection_name: str, batch_size: int = 100) -> List[Dict]:
+def retrieve_all_data_from_qdrant(collection_name: str = 'company_data', batch_size: int = 100) -> List[Dict]:
     """
     Retrieves all data points from a Qdrant collection.
 
@@ -146,7 +146,12 @@ def summarize_content(content_list: List[str], max_length: int = 50000) -> str:
 
 # Example usage
 if __name__ == "__main__":
-    all_data = retrieve_all_data_from_qdrant("company_data_v3")
+
+    url = "https://modulai.io/"
+    # url = "https://zenseact.com/"
+    collection_name = get_collection_name(url)
+
+    all_data = retrieve_all_data_from_qdrant(collection_name)
     for data in all_data:
         print(data)
 

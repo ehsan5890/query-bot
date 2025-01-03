@@ -1,7 +1,7 @@
 
 from flask import Flask, render_template, request, jsonify
 # from app import app  # Import the app instance from __init__.py
-from app.data_extraction import get_all_links, fetch_company_data, clean_data
+from app.data_extraction import get_all_links, fetch_company_data, clean_data, get_collection_name
 from app.data_retrieval import  retrieve_data_from_qdrant, filter_similar_content, summarize_content, remove_internal_duplicates
 from app.embedding import store_data_in_qdrant
 from dotenv import load_dotenv
@@ -31,28 +31,30 @@ def extract_data():
     # Fetch data for each link and filter out None values
     data_list = [fetch_company_data(url) for url in all_links]
     data_list = [item for item in data_list if item is not None]  # Filter out None values
-
+    collection_name = get_collection_name(base_url)
     if not data_list:
         return jsonify({"error": "No data extracted from the website"}), 400
 
     cleaned_data = clean_data(data_list)
 
     # Store cleaned data in Qdrant
-    store_data_in_qdrant(cleaned_data.to_dict(orient='records'))
+    store_data_in_qdrant(cleaned_data.to_dict(orient='records'), collection_name=collection_name)
 
     return jsonify({"message": "Data extracted and stored successfully"}), 200
 
 
 @app.route('/data/query', methods=['POST'])
 def query_data():
-
+    url = "https://modulai.io/"
+    # url = "https://zenseact.com/"
+    collection_name = get_collection_name(url)
     data = request.get_json()
     query = data.get('query')
     if not query:
         return jsonify({"error": "No query provided"}), 400
 
     # Retrieve relevant content from Qdrant
-    retrieved_data = retrieve_data_from_qdrant(query)
+    retrieved_data = retrieve_data_from_qdrant(query, collection_name=collection_name)
     content_list = [item.get('content', '') for item in retrieved_data]
     unique_content = filter_similar_content(content_list)
     # Extract content safely

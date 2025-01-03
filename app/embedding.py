@@ -26,7 +26,7 @@ def get_embedding(text: str) -> List[float]:
         a = 1
     return response.data[0].embedding
 
-def store_data_in_qdrant(data: List[Dict[str, str]], similarity_threshold: float = 0.99) -> None:
+def store_data_in_qdrant(data: List[Dict[str, str]], similarity_threshold: float = 0.99, collection_name: str = "company_data") -> None:
     """
     Stores the given data in Qdrant while avoiding duplicates.
 
@@ -35,7 +35,7 @@ def store_data_in_qdrant(data: List[Dict[str, str]], similarity_threshold: float
         similarity_threshold (float): Threshold above which a vector is considered a duplicate.
     """
     client = QdrantClient(host="localhost", port=6333)
-    collection_name = "company_data_v4"
+    # collection_name = "company_data_v4"
 
     if not client.collection_exists(collection_name=collection_name):
         client.create_collection(

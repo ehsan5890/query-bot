@@ -6,6 +6,8 @@ services:
       - "6333:6333"
     networks:
       - querybot-network
+    volumes:
+      - ./qdrant_data:/qdrant/storage
 
 networks:
   querybot-network:

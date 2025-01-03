@@ -8,7 +8,7 @@ from urllib.parse import urljoin
 import openai
 from bs4 import BeautifulSoup
 import requests
-from typing import Optional, Dict
+from urllib.parse import urlparse
 
 
 def get_all_links(base_url: str) -> List[str]:
@@ -106,4 +106,17 @@ def clean_data(data_list: List[Dict[str, str]]) -> pd.DataFrame:
     df['title'] = df['title'].str.strip().str.lower()
     return df
 
+def get_collection_name(url: str) -> str:
+    """
+    Generate a collection name based on the website URL.
+
+    Args:
+        url (str): The website URL.
+
+    Returns:
+        str: The collection name.
+    """
+
+    domain = urlparse(url).netloc.replace('.', '_')
+    return f"collection_{domain}"
 
