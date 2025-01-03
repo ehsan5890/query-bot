@@ -1,59 +1,80 @@
-from app.data_extraction import fetch_company_data, clean_data, get_all_links
-data_list = []
-url = "https://modulai.io/"
-links = get_all_links(url)
-for link in links:
-    data = fetch_company_data(link)
-    data_list.append(data)
-if data_list:
-    print(data_list)
-    processed_data = clean_data(data_list[0])
-    print("Extracted Data:")
-    print(processed_data)
-else:
-    print("Data extraction failed.")
 
 
-from qdrant_client import QdrantClient
-from typing import List
+import pytest
+import requests
+from unittest.mock import patch, Mock
+import pandas as pd
+from app.data_extraction import get_all_links, fetch_company_data, clean_data, get_collection_name
 
-def search_keyword_in_qdrant(keyword: str, collection_name: str = "company_data_v3", top_k: int = 10) -> List[dict]:
-    """
-    Searches the Qdrant collection for records that contain the specified keyword in their payload.
+# Mock data for testing
+MOCK_HTML = """
+<html>
+    <head><title>Test Page</title></head>
+    <body>
+        <a href="/link1">Link 1</a>
+        <a href="/link2">Link 2</a>
+        <a href="/login">Login</a>
+        <h1>Main Heading</h1>
+        <p>Sample paragraph.</p>
+    </body>
+</html>
+"""
 
-    Args:
-        keyword (str): The keyword to search for.
-        collection_name (str): The name of the collection to search in.
-        top_k (int): The number of most similar results to retrieve.
+# --- Tests for get_all_links ---
+@patch('app.data_extraction.requests.get')
+def test_get_all_links(mock_get):
+    mock_response = Mock()
+    mock_response.status_code = 200
+    mock_response.content = MOCK_HTML.encode('utf-8')
+    mock_get.return_value = mock_response
 
-    Returns:
-        List[dict]: A list of payloads that match the keyword.
-    """
-    client = QdrantClient(host="localhost", port=6333)
+    base_url = 'http://example.com'
+    expected_links = ['http://example.com/link1', 'http://example.com/link2']
 
-    # Scroll through all points in the collection
-    all_points = client.scroll(
-        collection_name=collection_name,
-        limit=1000,  # Adjust depending on how many records you have
-        with_payload=True
-    )
+    result = get_all_links(base_url)
+    assert set(result) == set(expected_links)
 
-    # Manually filter for the keyword in the payload
-    matching_points = []
-    for points in all_points:
-        for point in points:
-            if 'content' in point.payload and keyword.lower() in point.payload['content'].lower():
-                matching_points.append(point.payload)
+# --- Tests for fetch_company_data ---
+@patch('app.data_extraction.requests.get')
+def test_fetch_company_data_success(mock_get):
+    mock_response = Mock()
+    mock_response.status_code = 200
+    mock_response.content = MOCK_HTML.encode('utf-8')
+    mock_get.return_value = mock_response
 
-        # Stop if we reach the required number of results
-            if len(matching_points) >= top_k:
-                break
-        break
-    return matching_points
+    url = 'http://example.com/page'
+    result = fetch_company_data(url)
+    assert result is not None
+    assert result['title'] == 'Test Page'
+    assert 'Main Heading' in result['content']
+    assert 'Sample paragraph.' in result['content']
 
-# Example usage
-if __name__ == "__main__":
+@patch('app.data_extraction.requests.get')
+def test_fetch_company_data_failure(mock_get):
+    mock_response = Mock()
+    mock_response.status_code = 404
+    mock_get.return_value = mock_response
 
-    results = search_keyword_in_qdrant("Peter Grimvall")
-    for result in results:
-        print(result)
+    url = 'http://example.com/page'
+    result = fetch_company_data(url)
+    assert result is None
+
+# --- Tests for clean_data ---
+def test_clean_data():
+    sample_data = [
+        {'title': ' Title One ', 'content': 'Content 1'},
+        {'title': None, 'content': 'Content 2'},
+        {'title': 'Title Two', 'content': None},
+    ]
+    df = clean_data(sample_data)
+    assert len(df) == 1
+    assert df.iloc[0]['title'] == 'title one'
+
+# --- Tests for get_collection_name ---
+def test_get_collection_name():
+    url = 'http://example.com/page'
+    result = get_collection_name(url)
+    assert result == 'collection_example_com'
+
+if __name__ == '__main__':
+    pytest.main()
