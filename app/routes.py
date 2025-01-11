@@ -45,8 +45,8 @@ def extract_data():
 
 @app.route('/data/query', methods=['POST'])
 def query_data():
-    url = "https://modulai.io/"
-    # url = "https://zenseact.com/"
+    # url = "https://modulai.io/"
+    url = "https://zenseact.com/"
     collection_name = get_collection_name(url)
     data = request.get_json()
     query = data.get('query')
