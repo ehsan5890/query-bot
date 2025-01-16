@@ -5,10 +5,13 @@ from app.data_extraction import get_all_links, fetch_company_data, clean_data, g
 from app.data_retrieval import  retrieve_data_from_qdrant, filter_similar_content, summarize_content, remove_internal_duplicates
 from app.embedding import store_data_in_qdrant
 from dotenv import load_dotenv
+from collections import deque
 import openai
 import os
 load_dotenv()
-
+# Define a global history container with a max length
+MAX_CONTEXT_LENGTH = 2
+chat_history = deque(maxlen=MAX_CONTEXT_LENGTH)
 
 app = Flask(__name__)
 client = openai.OpenAI(
@@ -31,7 +34,8 @@ def extract_data():
     # Fetch data for each link and filter out None values
     data_list = [fetch_company_data(url) for url in all_links]
     data_list = [item for item in data_list if item is not None]  # Filter out None values
-    collection_name = get_collection_name(base_url)
+    # collection_name = get_collection_name(base_url)
+    collection_name = "collection_zenseact_com"
     if not data_list:
         return jsonify({"error": "No data extracted from the website"}), 400
 
@@ -63,6 +67,10 @@ def query_data():
     context = summarize_content(unique_content)
     print(context)
     print('232323\n')
+    history_context = "\n".join(
+        [f"User: {entry['user']}\nBot: {entry['bot']}" for entry in chat_history]
+    )
+    full_context = f"History:\n{history_context}\n\nCurrent Context:\n{context}"
     # Generate response using LLM
     try:
         chat_completion = client.chat.completions.create(
@@ -70,7 +78,7 @@ def query_data():
             messages=[
                 {"role": "system",
                  "content": "You are a helpful assistant that provides information based on given context."},
-                {"role": "user", "content": f"Context: {context}\n\nQuestion: {query}"}
+                {"role": "user", "content": f"Context: {full_context}\n\nQuestion: {query}"}
             ],
             max_tokens=1500,
             temperature=0.7  # Adjust temperature for more or less creative responses
@@ -78,7 +86,7 @@ def query_data():
         # print(chat_completion)
         # print(chat_completion['choices'])
         generated_response = chat_completion.choices[0].message.content
-
+        chat_history.append({"user": query, "bot": generated_response})
     except Exception as e:
         return jsonify({"error": f"OpenAI API Error: {e}"}), 500
     return jsonify({"response": generated_response})

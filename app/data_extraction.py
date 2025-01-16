@@ -36,12 +36,18 @@ def get_all_links(base_url: str) -> List[str]:
             soup = BeautifulSoup(response.content, 'html.parser')
             for link in soup.find_all('a', href=True):
                 full_url = urljoin(base_url, link['href'])
+                parsed_url = urlparse(full_url)
 
-                # Filtering out unwanted links
-                if (base_url in full_url and
-                        full_url not in all_links and
-                        not any(keyword in full_url for keyword in
-                                ['login', 'user-agreement', 'cookie-policy', 'help', 'legal'])):
+                # Filter out unwanted links and non-HTTP/HTTPS schemes
+                if (
+                    base_url in full_url
+                    and full_url not in all_links
+                    and parsed_url.scheme in {"http", "https"}
+                    and not any(
+                        keyword in full_url
+                        for keyword in ['login', 'user-agreement', 'cookie-policy', 'help', 'legal']
+                    )
+                ):
                     to_visit.append(full_url)
                     all_links.append(full_url)
 
